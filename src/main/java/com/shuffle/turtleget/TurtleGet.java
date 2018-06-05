@@ -10,6 +10,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.SortedSet;
 import java.util.TreeSet;
 import java.util.concurrent.ExecutorService;
@@ -67,7 +68,7 @@ public class TurtleGet {
 			throw new RuntimeException(e);
 		}
 		
-		this.dataFile = dataFile != null ? dataFile : defaultDataFile;
+		this.dataFile = Optional.ofNullable(dataFile).orElse(defaultDataFile);
 		setupFtpFileSystemOptions();
 		initFileSystemOptions();
 		loadData();
@@ -92,8 +93,10 @@ public class TurtleGet {
 		log.info("Loading download history");
 		for (DownloadData downloadData : data.getHistory()) {
 			try {
-				history.add(new Download(fileSystemManager.resolveFile(downloadData.getSource(), getFileSystemOptions(downloadData.getSource())),
-						fileSystemManager.resolveFile(downloadData.getDestination(), getFileSystemOptions(downloadData.getDestination()))));
+				Download download = new Download(fileSystemManager.resolveFile(downloadData.getSource(), getFileSystemOptions(downloadData.getSource())),
+						fileSystemManager.resolveFile(downloadData.getDestination(), getFileSystemOptions(downloadData.getDestination())));
+				download.setStatus(DownloadStatus.COMPLETE);
+				history.add(download);
 			} catch (FileSystemException e) {
 				log.error("Error loading download history", e);
 			}
@@ -124,14 +127,14 @@ public class TurtleGet {
 	private void saveDataQueue() {
 		data.getQueue().clear();
 		for (Download download : queue) {
-			data.getQueue().add(new DownloadData(download.getSource().getName().toString(), download.getDestination().getName().toString(), download.getAdded()));
+			data.getQueue().add(new DownloadData(download.getSource().getName().getURI(), download.getDestination().getName().getURI(), download.getAdded()));
 		}
 	}
 
 	private void saveDataHistory() {
 		data.getHistory().clear();
 		for (Download download : history) {
-			data.getHistory().add(new DownloadData(download.getSource().getName().toString(), download.getDestination().getName().toString(), download.getAdded()));
+			data.getHistory().add(new DownloadData(download.getSource().getName().getURI(), download.getDestination().getName().getURI(), download.getAdded()));
 		}
 	}
 
@@ -161,6 +164,8 @@ public class TurtleGet {
 		ftpFileSystemConfigBuilder.setSoTimeout(ftpFileSystemOptions, 10000);
 		ftpFileSystemConfigBuilder.setConnectTimeout(ftpFileSystemOptions, 10000);
 		ftpFileSystemConfigBuilder.setDataTimeout(ftpFileSystemOptions, 10000);
+		//FIX the not found file sometimes
+		ftpFileSystemConfigBuilder.setUserDirIsRoot(ftpFileSystemOptions, true);
 	}
 
 	private FileSystemOptions getFileSystemOptions(String path) {
@@ -262,7 +267,8 @@ public class TurtleGet {
 		log.debug("creating new Download");
 		Download download = new Download(source, destination);
 		log.debug("new Download created");
-		if (queue.contains(download) || history.contains(download)) {
+		
+		if (queue.stream().filter(d -> d.equals(download)).findFirst().isPresent() || history.stream().filter(d -> d.equals(download)).findFirst().isPresent()) {
 			log.info(download.getName() + " was already downloaded and/or in queue");
 		} else {
 			addDownload(download, startType);
@@ -275,7 +281,7 @@ public class TurtleGet {
 
 	public void addDownload(Download download, StartType startType) {
 		log.debug("adding to queue" + download);
-		if (!history.contains(download) && !getQueue().contains(download)) {
+		if (!history.stream().filter(d -> d.equals(download)).findFirst().isPresent() && !getQueue().stream().filter(d -> d.equals(download)).findFirst().isPresent()) {
 			getQueue().add(download);
 			saveData();
 			log.info("Added to queue : " + download);

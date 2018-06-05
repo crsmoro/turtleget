@@ -84,6 +84,10 @@ public class Download implements Comparator<Download>, Comparable<Download>, Cal
 		return percent;
 	}
 
+	protected void setStatus(DownloadStatus status) {
+		this.status = status;
+	}
+
 	public DownloadStatus getStatus() {
 		return status;
 	}
@@ -167,12 +171,12 @@ public class Download implements Comparator<Download>, Comparable<Download>, Cal
 		if (destination == null) {
 			if (other.destination != null)
 				return false;
-		} else if (!destination.getPublicURIString().equals(other.destination.getPublicURIString()))
+		} else if (!destination.getName().getURI().equals(other.destination.getName().getURI()))
 			return false;
 		if (source == null) {
 			if (other.source != null)
 				return false;
-		} else if (!source.getPublicURIString().equals(other.source.getPublicURIString()))
+		} else if (!source.getName().getURI().equals(other.source.getName().getURI()))
 			return false;
 		return true;
 	}
